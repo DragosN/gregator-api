@@ -1,6 +1,8 @@
 package com.gregator.cron;
 
 import ch.qos.logback.core.CoreConstants;
+import com.gregator.model.Ticker;
+import com.gregator.repository.TickerDao;
 import com.litesoftwares.coingecko.CoinGeckoApiClient;
 import com.litesoftwares.coingecko.constant.Currency;
 import com.litesoftwares.coingecko.domain.Coins.CoinFullData;
@@ -11,22 +13,52 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Service
 public class CoinGeckoCrawler {
 
     private final CoinGeckoApiClient coinGecko;
+    private final TickerDao tickerDao;
 
     @Autowired
-    public CoinGeckoCrawler(CoinGeckoApiClient coinGecko) {
+    public CoinGeckoCrawler(CoinGeckoApiClient coinGecko, TickerDao tickerDao) {
         this.coinGecko = coinGecko;
+        this.tickerDao = tickerDao;
     }
 
     @PostConstruct
     public void postConstruct() {
-        updateCoinsList();
-        crawlCoinGecko();
+
+        /**
+         * get / update list of coins tickers
+         */
+        getCoinsTicker();
+
+//        updateCoinsList();
+//        crawlCoinGecko();
+    }
+
+    private void getCoinsTicker() {
+        List<CoinList> coinList = coinGecko.getCoinList();
+        List<Ticker> tickers = coinList.stream()
+                .map(coin -> {
+                    Ticker existingTicker = tickerDao.findTickerByNameAndSymbolIgnoreCase(coin.getName(), coin.getSymbol());
+
+                    if (existingTicker == null) {
+                        Ticker ticker = new Ticker();
+                        ticker.setName(coin.getName());
+                        ticker.setSymbol(coin.getSymbol());
+                        return ticker;
+                    }
+                    return null;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        tickerDao.saveAll(tickers);
     }
 
     private void updateCoinsList() {

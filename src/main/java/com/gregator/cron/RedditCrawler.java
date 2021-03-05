@@ -26,7 +26,6 @@ public class RedditCrawler {
         this.redditClient = redditClient;
     }
 
-
     @PostConstruct
     public void postConstruct() {
         crawlReddit();
